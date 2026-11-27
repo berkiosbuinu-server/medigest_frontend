@@ -363,6 +363,37 @@ export interface ProfitHistoryItem {
 }
 
 // ===================================================================
+// RÉSUMÉ PAR DEVISE (GET /dashboard/currency-summary)
+// ===================================================================
+
+export interface CurrencyBucket {
+  sales_amount: number;
+  sales_count: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  expenses_amount: number;
+  expenses_count: number;
+  debts_amount: number;
+  debts_count: number;
+  returns_amount: number;
+  returns_count: number;
+}
+
+export interface CurrencySummaryResponse {
+  start_date: string;
+  end_date: string;
+  currencies: string[];
+  by_currency: Record<string, CurrencyBucket>;
+}
+
+export interface CurrencySummaryFilters {
+  branch_id?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+// ===================================================================
 // CONFIGURATION
 // ===================================================================
 
@@ -577,6 +608,22 @@ class DashboardService {
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getDashboardStats');
+    }
+  }
+
+  async getCurrencySummary(filters?: CurrencySummaryFilters): Promise<CurrencySummaryResponse> {
+    try {
+      const response = await this.api.get('/dashboard/currency-summary', {
+        params: {
+          ...(filters?.branch_id ? { branch_id: filters.branch_id } : {}),
+          ...(filters?.start_date ? { start_date: filters.start_date } : {}),
+          ...(filters?.end_date ? { end_date: filters.end_date } : {}),
+        },
+        timeout: 60000,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getCurrencySummary');
     }
   }
 
