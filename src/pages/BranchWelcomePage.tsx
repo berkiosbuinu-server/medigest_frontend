@@ -14,6 +14,7 @@ import {
   Settings,
   ArrowRight,
   Repeat,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -122,7 +123,7 @@ function readStoredBranchName(): string | null {
 
 export default function BranchWelcomePage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { currentBranch } = usePharmacy();
 
   const branchName = currentBranch?.name || user?.branch_name || readStoredBranchName() || 'votre succursale';
@@ -133,6 +134,18 @@ export default function BranchWelcomePage() {
 
   return (
     <div className="max-w-5xl mx-auto py-6">
+      <div className="flex justify-end mb-4">
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login', { replace: true });
+          }}
+          className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-red-600"
+        >
+          <LogOut size={16} /> Se déconnecter
+        </button>
+      </div>
       <div className="rounded-2xl bg-linear-to-br from-blue-600 to-indigo-700 text-white p-8 shadow-lg mb-8">
         <div className="flex items-center gap-3 mb-3 text-blue-100">
           <Building2 size={22} />

@@ -231,7 +231,7 @@ const configApi = {
 
   // Users
   getUsers: (branchId?: string) =>
-    api.get('/users', { params: { branch_id: branchId } }),
+    api.get('/users', { params: { branch_id: branchId, limit: 100 } }),
   assignUserToBranch: (userId: string, branchId: string) =>
     api.patch(`/users/${userId}`, { branch_id: branchId }),
 
@@ -251,6 +251,15 @@ const configApi = {
 // ============================================================================
 // COMPOSANTS PRINCIPAUX
 // ============================================================================
+
+// Accepte un tableau, ou un objet paginé ({ users: [...] }, { items: [...] }, ...)
+const toArray = <T,>(data: any, keys: string[] = ['items', 'data']): T[] => {
+  if (Array.isArray(data)) return data as T[];
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) return data[key] as T[];
+  }
+  return [];
+};
 
 const ConfigView: React.FC = () => {
   const queryClient = useQueryClient();
@@ -381,15 +390,21 @@ const ConfigView: React.FC = () => {
       
       // Charger les branches
       const branchesRes = await configApi.getBranches(id);
-      setBranches(branchesRes.data);
+      setBranches(toArray<Branch>(branchesRes.data, ['branches', 'items', 'data']));
       
       // Charger les utilisateurs
       const usersRes = await configApi.getUsers();
-      setUsers(usersRes.data);
+      setUsers(toArray<User>(usersRes.data, ['users', 'items', 'data']));
       
       // Charger les jours fériés
-      const holidaysRes = await configApi.getHolidays(id);
-      setHolidays(holidaysRes.data || []);
+      try {
+        const holidaysRes = await configApi.getHolidays(id);
+        setHolidays(toArray<Holiday>(holidaysRes.data, ['holidays', 'items', 'data']));
+      } catch (holidayError) {
+        // Ne pas bloquer le reste de la configuration si les jours fériés sont indisponibles
+        console.warn('Jours fériés indisponibles:', holidayError);
+        setHolidays([]);
+      }
       
       // Charger les infos de la pharmacie
       const pharmacyRes = await configApi.getPharmacy(id);

@@ -1,5 +1,5 @@
 // routes/AppRoutes.tsx - Version complète et corrigée
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 // SuperAdmins
@@ -103,6 +103,9 @@ const NotFoundPage = () => (
 // ========== LAYOUT ADMIN (CORRIGÉ) ==========
 const AdminLayout = () => {
   const { user, isLoading } = useAuthStore();
+  const { pathname } = useLocation();
+  // La page d'accueil (bienvenue) s'affiche plein écran, sans menu latéral
+  const hideSidebar = pathname === '/bienvenue';
   
   if (isLoading) {
     return (
@@ -130,7 +133,7 @@ const AdminLayout = () => {
   
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      {!hideSidebar && <Sidebar />}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           <ExpiryWarningBanner />

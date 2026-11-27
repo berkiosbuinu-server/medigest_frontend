@@ -366,7 +366,7 @@ export interface ProfitHistoryItem {
 // CONFIGURATION
 // ===================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://my-backend-ydit.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.medigestpro.net/api/v1';
 const DASHBOARD_TIMEOUT = 120000; // 120 secondes pour les gros volumes
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 2000; // 2 secondes

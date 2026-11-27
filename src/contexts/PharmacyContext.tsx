@@ -58,7 +58,11 @@ interface PharmacyContextType {
 const PharmacyContext = createContext<PharmacyContextType | undefined>(undefined);
 
 // Configuration API
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://my-backend-ydit.onrender.com';
+// Même source que le client axios (VITE_API_URL, qui se termine par /api/v1) :
+// on retire le suffixe /api/vN pour reconstruire les URLs avec API_VERSION.
+const RAW_API_URL: string =
+  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://api.medigestpro.net';
+const API_BASE_URL = RAW_API_URL.trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/, '');
 const API_VERSION = '/api/v1';
 
 export function usePharmacy() {
