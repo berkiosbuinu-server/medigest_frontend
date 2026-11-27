@@ -393,6 +393,50 @@ export interface CurrencySummaryFilters {
   end_date?: string;
 }
 
+export type BranchSubscriptionReason =
+  | 'none'
+  | 'expired'
+  | 'trial_ended'
+  | 'suspended'
+  | 'cancelled'
+  | null;
+
+export interface BranchSubscriptionStatus {
+  /** false = rien à vérifier (super admin, ou admin sans branche choisie) */
+  applicable: boolean;
+  is_active: boolean;
+  reason: BranchSubscriptionReason;
+  has_subscription?: boolean;
+  branch_id?: string | null;
+  branch_name?: string;
+  status?: string;
+  plan?: string;
+  plan_name?: string;
+  end_date?: string | null;
+  days_remaining?: number | null;
+  is_trial?: boolean;
+}
+
+export type CurrencyDetailType = 'sales' | 'expenses' | 'profit' | 'debts' | 'returns';
+
+export interface CurrencyDetailFilters {
+  type: CurrencyDetailType;
+  currency: string;
+  branch_id?: string;
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+}
+
+export interface CurrencyDetailResponse {
+  type: CurrencyDetailType;
+  currency: string;
+  start_date: string;
+  end_date: string;
+  summary: Record<string, number | null>;
+  items: Array<Record<string, any>>;
+}
+
 // ===================================================================
 // CONFIGURATION
 // ===================================================================
@@ -624,6 +668,37 @@ class DashboardService {
       return response.data;
     } catch (error) {
       return this.handleError(error, 'getCurrencySummary');
+    }
+  }
+
+  async getBranchSubscriptionStatus(branchId?: string): Promise<BranchSubscriptionStatus> {
+    try {
+      const response = await this.api.get('/dashboard/subscription-status', {
+        params: branchId ? { branch_id: branchId } : {},
+        timeout: 30000,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getBranchSubscriptionStatus');
+    }
+  }
+
+  async getCurrencyDetail(filters: CurrencyDetailFilters): Promise<CurrencyDetailResponse> {
+    try {
+      const response = await this.api.get('/dashboard/currency-detail', {
+        params: {
+          type: filters.type,
+          currency: filters.currency,
+          ...(filters.branch_id ? { branch_id: filters.branch_id } : {}),
+          ...(filters.start_date ? { start_date: filters.start_date } : {}),
+          ...(filters.end_date ? { end_date: filters.end_date } : {}),
+          ...(filters.limit ? { limit: filters.limit } : {}),
+        },
+        timeout: 60000,
+      });
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getCurrencyDetail');
     }
   }
 

@@ -20,6 +20,7 @@ import Sidebar from '@/layouts/Sidebar';
 
 // Vues du Dashboard
 import Dashboard from '@/modules/stats/views/Dashboard';
+import DashboardDetailScreen from '@/modules/stats/views/DashboardDetailScreen';
 import InventoryListView from '@/modules/inventory/views/inventoryListView';
 import VendorPos from '@/modules/vendor/VendorPos';
 import TransferList from '@/modules/inventory/views/TransferList';
@@ -304,6 +305,7 @@ export default function AppRoutes() {
       
       <Route path="/dashboard" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
+        <Route path="detail/:type" element={<DashboardDetailScreen />} />
       </Route>
       
       <Route path="/factures" element={<AdminLayout />}>

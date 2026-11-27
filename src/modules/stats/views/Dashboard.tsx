@@ -1,11 +1,9 @@
 // modules/stats/views/Dashboard.tsx
 /**
  * Tableau de bord
- * - Consomme uniquement /api/v1/dashboard (currency-summary)
- * - Une section de cartes par devise ayant des données
- * - Cartes : Ventes, Dépenses, Bénéfices, Dettes, Retours
- * - S'adapte à la branche active de l'utilisateur
- * - Vérifie l'abonnement avant d'afficher l'annonce « Mode lecture seule »
+ * - Données : GET /api/v1/dashboard/currency-summary (une section de cartes par devise)
+ * - Abonnement : GET /api/v1/dashboard/subscription-status (abonnement de la branche active)
+ * - Clic sur une carte : ouvre DashboardDetailScreen (/dashboard/detail/:type)
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -14,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Building2,
+  ChevronRight,
   CreditCard,
   LayoutDashboard,
   RefreshCw,
@@ -24,79 +23,41 @@ import {
 } from 'lucide-react';
 
 import { useAuthStore } from '@/store/useAuthStore';
-import { usePharmacy } from '@/contexts/PharmacyContext';
-import { useSubscription } from '@/hooks/useSubscription';
 import { ExpiryWarningBanner } from '@/components/ExpiryWarningBanner';
 import dashboardService, {
+  BranchSubscriptionReason,
+  BranchSubscriptionStatus,
   CurrencyBucket,
   CurrencySummaryResponse,
 } from '@/services/dashboardService';
+import { useDashboardBranch } from '@/modules/stats/useDashboardBranch';
+import {
+  CURRENCY_LABELS,
+  DetailType,
+  Period,
+  formatAmount,
+  formatLongDate,
+  getErrorMessage,
+  getRange,
+  plural,
+} from '@/modules/stats/dashboardUtils';
 
 // ===================================================================
 // TYPES
 // ===================================================================
 
-type Period = 'today' | 'month';
-
-type ReadOnlyReason = 'expired' | 'trial_ended' | 'inactive' | 'none';
-
 interface CardDef {
-  id: string;
+  type: DetailType;
   title: string;
   value: string;
   subtitle: string;
   icon: React.ReactElement;
   iconClass: string;
-  href: string;
 }
 
 // ===================================================================
 // UTILITAIRES
 // ===================================================================
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  FC: 'FC',
-  CDF: 'FC',
-  USD: '$',
-  EUR: '€',
-  GNF: 'FG',
-  XOF: 'FCFA',
-};
-
-const CURRENCY_LABELS: Record<string, string> = {
-  FC: 'Franc congolais',
-  CDF: 'Franc congolais',
-  USD: 'Dollar américain',
-  EUR: 'Euro',
-  GNF: 'Franc guinéen',
-  XOF: 'Franc CFA',
-};
-
-const DECIMAL_CURRENCIES = new Set(['USD', 'EUR']);
-
-function formatAmount(value: number, currency: string): string {
-  const decimals = DECIMAL_CURRENCIES.has(currency) ? 2 : 0;
-  const number = new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(Number.isFinite(value) ? value : 0);
-  const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
-  return `${number} ${symbol}`;
-}
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function getRange(period: Period): { start: string; end: string } {
-  const now = new Date();
-  const end = toIsoDate(now);
-  if (period === 'today') return { start: end, end };
-  return { start: toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1)), end };
-}
 
 function hasData(b: CurrencyBucket): boolean {
   return (
@@ -112,71 +73,49 @@ function hasData(b: CurrencyBucket): boolean {
   );
 }
 
-function plural(n: number, singular: string, pluralForm: string): string {
-  return `${n} ${n > 1 ? pluralForm : singular}`;
-}
-
-function formatLongDate(iso?: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Erreur lors du chargement des données';
-}
-
 function buildCards(currency: string, b: CurrencyBucket, period: Period): CardDef[] {
   const margin = b.revenue > 0 ? Math.round((b.profit / b.revenue) * 1000) / 10 : null;
-  const salesLabel = period === 'today' ? "Ventes d'aujourd'hui" : 'Ventes du mois';
 
   return [
     {
-      id: 'sales',
-      title: salesLabel,
+      type: 'sales',
+      title: period === 'today' ? "Ventes d'aujourd'hui" : 'Ventes du mois',
       value: formatAmount(b.sales_amount, currency),
       subtitle: plural(b.sales_count, 'vente', 'ventes'),
       icon: <ShoppingBag size={20} />,
       iconClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-      href: '/historique',
     },
     {
-      id: 'expenses',
+      type: 'expenses',
       title: 'Dépenses',
       value: formatAmount(b.expenses_amount, currency),
       subtitle: plural(b.expenses_count, 'dépense', 'dépenses'),
       icon: <Wallet size={20} />,
       iconClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-      href: '/expenses',
     },
     {
-      id: 'profit',
+      type: 'profit',
       title: 'Bénéfices',
       value: formatAmount(b.profit, currency),
       subtitle: margin !== null ? `Marge ${margin}%` : 'Aucune marge calculable',
       icon: <TrendingUp size={20} />,
       iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-      href: '/profits',
     },
     {
-      id: 'debts',
+      type: 'debts',
       title: 'Dettes',
       value: formatAmount(b.debts_amount, currency),
       subtitle: `${plural(b.debts_count, 'dette', 'dettes')} (solde restant)`,
       icon: <CreditCard size={20} />,
       iconClass: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-      href: '/debts',
     },
     {
-      id: 'returns',
+      type: 'returns',
       title: 'Retours',
       value: formatAmount(b.returns_amount, currency),
       subtitle: plural(b.returns_count, 'retour', 'retours'),
       icon: <RotateCcw size={20} />,
       iconClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-      href: '/returns',
     },
   ];
 }
@@ -185,56 +124,65 @@ function buildCards(currency: string, b: CurrencyBucket, period: Period): CardDe
 // ANNONCE « MODE LECTURE SEULE »
 // ===================================================================
 
-const READ_ONLY_MESSAGES: Record<ReadOnlyReason, (expiredOn: string | null) => string> = {
+const READ_ONLY_MESSAGES: Record<
+  NonNullable<BranchSubscriptionReason>,
+  (expiredOn: string | null) => string
+> = {
   expired: (date) =>
-    `Votre abonnement a expiré${date ? ` le ${date}` : ''}. Vous ne pouvez pas modifier les données.`,
+    `L'abonnement de cette branche a expiré${date ? ` le ${date}` : ''}. Vous ne pouvez pas modifier les données.`,
   trial_ended: () =>
-    "Votre période d'essai est terminée. Vous ne pouvez pas modifier les données.",
-  inactive: () => 'Votre abonnement est inactif. Vous ne pouvez pas modifier les données.',
-  none: () => "Aucun abonnement actif n'a été trouvé. Vous ne pouvez pas modifier les données.",
+    "La période d'essai de cette branche est terminée. Vous ne pouvez pas modifier les données.",
+  suspended: () =>
+    "L'abonnement de cette branche est suspendu. Vous ne pouvez pas modifier les données.",
+  cancelled: () =>
+    "L'abonnement de cette branche a été annulé. Vous ne pouvez pas modifier les données.",
+  none: () =>
+    "Aucun abonnement n'est actif pour cette branche. Vous ne pouvez pas modifier les données.",
 };
 
 const ReadOnlyBanner: React.FC<{
-  reason: ReadOnlyReason;
-  expiredOn: string | null;
+  status: BranchSubscriptionStatus;
   onRenew: () => void;
-}> = ({ reason, expiredOn, onRenew }) => (
-  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20">
-    <div className="flex items-start gap-3">
-      <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-500" />
-      <div>
-        <p className="mb-1 text-sm font-bold text-amber-800 dark:text-amber-300">Mode lecture seule</p>
-        <p className="text-xs text-amber-700 dark:text-amber-400">
-          {READ_ONLY_MESSAGES[reason](expiredOn)}
-          <button
-            type="button"
-            onClick={onRenew}
-            className="ml-2 font-bold text-amber-800 underline dark:text-amber-300"
-          >
-            Renouveler mon abonnement
-          </button>
-        </p>
+}> = ({ status, onRenew }) => {
+  const reason = status.reason ?? 'none';
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20">
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-500" />
+        <div>
+          <p className="mb-1 text-sm font-bold text-amber-800 dark:text-amber-300">Mode lecture seule</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            {READ_ONLY_MESSAGES[reason](formatLongDate(status.end_date))}
+            <button
+              type="button"
+              onClick={onRenew}
+              className="ml-2 font-bold text-amber-800 underline dark:text-amber-300"
+            >
+              Renouveler mon abonnement
+            </button>
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ===================================================================
 // COMPOSANTS D'AFFICHAGE
 // ===================================================================
 
-const StatCard: React.FC<{ card: CardDef; onOpen: (href: string) => void }> = ({ card, onOpen }) => (
+const StatCard: React.FC<{ card: CardDef; onOpen: (type: DetailType) => void }> = ({ card, onOpen }) => (
   <div
     role="button"
     tabIndex={0}
-    onClick={() => onOpen(card.href)}
+    onClick={() => onOpen(card.type)}
     onKeyDown={(e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        onOpen(card.href);
+        onOpen(card.type);
       }
     }}
-    className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800"
+    className="group cursor-pointer rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800"
   >
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -244,6 +192,9 @@ const StatCard: React.FC<{ card: CardDef; onOpen: (href: string) => void }> = ({
       </div>
       <div className={`shrink-0 rounded-xl p-3 ${card.iconClass}`}>{card.icon}</div>
     </div>
+    <div className="mt-3 flex items-center justify-end text-xs font-bold text-blue-600 opacity-70 transition-opacity group-hover:opacity-100 dark:text-blue-400">
+      Voir le détail <ChevronRight size={14} />
+    </div>
   </div>
 );
 
@@ -252,7 +203,7 @@ const SkeletonGrid: React.FC = () => (
     {Array.from({ length: 5 }).map((_, i) => (
       <div
         key={i}
-        className="h-28 animate-pulse rounded-2xl border border-slate-100 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+        className="h-32 animate-pulse rounded-2xl border border-slate-100 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
       />
     ))}
   </div>
@@ -265,35 +216,8 @@ const SkeletonGrid: React.FC = () => (
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isSuperAdmin } = useAuthStore();
-
-  // Branche active : même source que le reste de l'application (PharmacyContext),
-  // avec repli sur la branche mémorisée (localStorage) puis sur celle de l'utilisateur.
-  const { currentBranch, currentPharmacy, isLoading: isLoadingBranch } = usePharmacy();
-
-  const branchId = useMemo((): string | null => {
-    const u = user as { branch_id?: string | null; active_branch_id?: string | null; branch_name?: string } | null;
-    let stored: string | null = null;
-    try {
-      stored = localStorage.getItem('active_branch_id');
-    } catch {
-      stored = null;
-    }
-    return currentBranch?.id || stored || u?.active_branch_id || u?.branch_id || null;
-  }, [currentBranch, user]);
-
-  const branchName =
-    currentBranch?.name || (user as { branch_name?: string } | null)?.branch_name || null;
-  const isMainBranch = Boolean(currentBranch?.is_main_branch);
-  const parentPharmacyName = currentPharmacy?.name || null;
-
-  const {
-    subscription,
-    isLoading: isLoadingSubscription,
-    isReadOnly,
-    isExpired,
-    isTrial,
-    error: subscriptionError,
-  } = useSubscription();
+  const { branchId, branchName, isMainBranch, parentPharmacyName, isLoading: isLoadingBranch } =
+    useDashboardBranch();
 
   const [period, setPeriod] = useState<Period>('today');
 
@@ -308,26 +232,24 @@ const Dashboard: React.FC = () => {
     }
   }, [isAuthenticated, isSuperAdmin, navigate]);
 
-  // ---------- Abonnement : vérifié AVANT d'afficher l'annonce ----------
+  // ---------- Abonnement de la branche active (vérifié avant d'afficher l'annonce) ----------
   const isSuperAdminUser = (user as { role?: string } | null)?.role === 'super_admin';
 
-  // Tant que la réponse de l'API abonnement n'est pas arrivée, on ne décide de rien.
-  const subscriptionChecked =
-    !isLoadingSubscription && (Boolean(subscription) || Boolean(subscriptionError));
+  const { data: subscriptionStatus, refetch: refetchSubscription } = useQuery<BranchSubscriptionStatus>({
+    queryKey: ['dashboard', 'subscription-status', branchId ?? 'none'],
+    queryFn: () => dashboardService.getBranchSubscriptionStatus(branchId ?? undefined),
+    enabled: Boolean(isAuthenticated) && !isLoadingBranch && !isSuperAdminUser,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
 
-  const showReadOnlyBanner = subscriptionChecked && isReadOnly && !isSuperAdminUser;
+  // Pas de réponse (chargement ou erreur) => aucune annonce : on n'affirme jamais un état non vérifié.
+  const showReadOnlyBanner = Boolean(
+    subscriptionStatus && subscriptionStatus.applicable && !subscriptionStatus.is_active,
+  );
 
-  const readOnlyReason = useMemo((): ReadOnlyReason => {
-    if (!subscription) return 'none';
-    const isTrialPlan = isTrial || subscription.plan_name?.toLowerCase() === 'trial';
-    if (isTrialPlan && isExpired) return 'trial_ended';
-    if (subscription.end_date && isExpired) return 'expired';
-    return 'inactive';
-  }, [subscription, isTrial, isExpired]);
-
-  const expiredOn = formatLongDate(subscription?.end_date);
-
-  // ---------- Données : une seule source, /api/v1/dashboard/currency-summary ----------
+  // ---------- Données ----------
   const range = useMemo(() => getRange(period), [period]);
 
   const {
@@ -350,7 +272,7 @@ const Dashboard: React.FC = () => {
     refetchOnWindowFocus: true,
   });
 
-  // Devises ayant réellement des données (une section de cartes par devise)
+  // Devises ayant réellement des données
   const currencySections = useMemo(() => {
     if (!data?.by_currency) return [];
     return Object.entries(data.by_currency)
@@ -358,22 +280,29 @@ const Dashboard: React.FC = () => {
       .map(([currency, bucket]) => ({ currency, cards: buildCards(currency, bucket, period) }));
   }, [data, period]);
 
-  const handleOpen = useCallback((href: string) => navigate(href), [navigate]);
+  const handleOpen = useCallback(
+    (type: DetailType, currency: string) =>
+      navigate(`/dashboard/detail/${type}?currency=${encodeURIComponent(currency)}&period=${period}`),
+    [navigate, period],
+  );
   const handleRenew = useCallback(() => navigate('/subscription'), [navigate]);
+  const handleRefresh = useCallback(() => {
+    void refetch();
+    void refetchSubscription();
+  }, [refetch, refetchSubscription]);
 
   const showSkeleton = isLoadingBranch || (isLoadingData && !data);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-10 transition-colors sm:px-6 lg:px-8">
-      {/* Annonce : uniquement une fois l'abonnement vérifié */}
-      {showReadOnlyBanner && (
-        <ReadOnlyBanner reason={readOnlyReason} expiredOn={expiredOn} onRenew={handleRenew} />
+      {showReadOnlyBanner && subscriptionStatus && (
+        <ReadOnlyBanner status={subscriptionStatus} onRenew={handleRenew} />
       )}
 
       <ExpiryWarningBanner />
 
       {/* En-tête */}
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
         <div className="space-y-2">
           <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-800 dark:text-slate-200 sm:text-3xl">
             <LayoutDashboard className="text-blue-600 dark:text-blue-400" size={28} />
@@ -400,30 +329,32 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex w-full items-center gap-3 sm:w-auto">
-          <div className="flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
+        {/* Période + actualiser : boutons bien séparés */}
+        <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+          <div className="flex items-center gap-3">
             {([
               ['today', "Aujourd'hui"],
               ['month', 'Ce mois'],
-            ] as const).map(([key, label]) => (
+            ] as const).map(([key, text]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setPeriod(key)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
+                aria-pressed={period === key}
+                className={`rounded-xl border px-5 py-2 text-sm font-bold transition-colors ${
                   period === key
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700'
+                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
               >
-                {label}
+                {text}
               </button>
             ))}
           </div>
 
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             disabled={isFetching}
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
           >
@@ -469,7 +400,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((card) => (
-                  <StatCard key={card.id} card={card} onOpen={handleOpen} />
+                  <StatCard key={card.type} card={card} onOpen={(type) => handleOpen(type, currency)} />
                 ))}
               </div>
             </section>
