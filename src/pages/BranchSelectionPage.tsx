@@ -54,7 +54,7 @@ export default function BranchSelectionPage() {
       return;
     }
     if (!isBranchlessAdmin) {
-      navigate('/dashboard', { replace: true });
+      navigate('/bienvenue', { replace: true });
       return;
     }
     // Ne jamais reprendre une branche précédente silencieusement après une nouvelle connexion.
@@ -85,7 +85,7 @@ export default function BranchSelectionPage() {
         email: null,
       } as any);
       toast.success(`Branche « ${branch.name} » sélectionnée`);
-      navigate('/dashboard', { replace: true });
+      navigate('/bienvenue', { replace: true });
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message;

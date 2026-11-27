@@ -133,7 +133,7 @@ const OutOfService = ({ workingHours: propWorkingHours, message: propMessage, ne
         if (response.data.in_service) {
           // Service revenu, rediriger vers la page appropriée
           if (user?.has_subscription) {
-            navigate('/dashboard', { replace: true });
+            navigate('/bienvenue', { replace: true });
           } else {
             navigate('/subscription', { replace: true });
           }
@@ -206,7 +206,7 @@ const OutOfService = ({ workingHours: propWorkingHours, message: propMessage, ne
         
         if (response.data.in_service) {
           if (user?.has_subscription) {
-            navigate('/dashboard', { replace: true });
+            navigate('/bienvenue', { replace: true });
           } else {
             navigate('/subscription', { replace: true });
           }

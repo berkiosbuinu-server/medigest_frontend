@@ -17,14 +17,14 @@ export const ROUTE_CONFIG = {
   subscription: ['/subscription', '/payment', '/payment-success', '/activate-code'] as const,
   roleDefaults: {
     super_admin: '/super-admin',
-    admin: '/dashboard',
+    admin: '/bienvenue',
     seller: '/vendor-pos',
     vendeur: '/vendor-pos',
-    default: '/dashboard',
+    default: '/bienvenue',
   },
   roleAllowedRoutes: {
     super_admin: ['/super-admin', '/superadmin-welcome'],
-    admin: ['/dashboard', '/settings', '/stock', '/inventaire', '/transfers', '/returns', '/monitoring', '/finance', '/capital', '/expenses', '/profits', '/suppliers', '/clients', '/users', '/reports', '/factures', '/historique', '/rapports'],
+    admin: ['/dashboard', '/bienvenue', '/settings', '/stock', '/inventaire', '/transfers', '/returns', '/monitoring', '/finance', '/capital', '/expenses', '/profits', '/suppliers', '/clients', '/users', '/reports', '/factures', '/historique', '/rapports'],
     seller: ['/vendor-pos', '/vendor-pos/stock-report'],
   },
 } as const;

@@ -22,7 +22,7 @@ import {
   ShoppingCart, Package, ArrowLeftRight, 
   RotateCcw, BadgeEuro, TrendingUp, Users, FileText, 
   Settings, Truck, UserCircle, Wallet, Bell, AlertTriangle,
-  LayoutDashboard, Menu, X, LogOut, ChevronDown,
+  Home, LayoutDashboard, Menu, X, LogOut, ChevronDown,
   DollarSign, HelpCircle, History, ShoppingBag,
   LineChart, CreditCard, UsersRound, TruckIcon,
   Calculator, Crown, ClipboardList,
@@ -108,6 +108,12 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Général",
     items: [
+      {
+        icon: <Home size={20}/>,
+        label: 'Accueil',
+        href: '/bienvenue',
+        roles: ["admin", "gestionnaire", "pharmacien", "caissier", "comptable", "stockiste", "preparateur"]
+      },
       { 
         icon: <LayoutDashboard size={20}/>, 
         label: 'Tableau de bord', 

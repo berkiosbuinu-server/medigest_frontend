@@ -45,6 +45,7 @@ import UserPageControl from '@/pages/users/UserPageControl';
 import Alerts from '@/modules/inventory/alerts';
 import CorbeillePage from '@/pages/CorbeillePage';
 import BranchSelectionPage from '@/pages/BranchSelectionPage';
+import BranchWelcomePage from '@/pages/BranchWelcomePage';
 
 // ========== COMPOSANTS WRAPPERS ==========
 
@@ -220,7 +221,7 @@ const PublicLayout = () => {
         if (user.role === 'admin' && !user.branch_id) {
           return <Navigate to="/select-branch" replace />;
         }
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/bienvenue" replace />;
     }
   }
   
@@ -291,7 +292,11 @@ export default function AppRoutes() {
       
       {/* ROUTES ADMIN (toutes ces routes sont accessibles à admin, super_admin et autres rôles backoffice) */}
       <Route path="/" element={<AdminLayout />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to="/bienvenue" replace />} />
+      </Route>
+      
+      <Route path="/bienvenue" element={<AdminLayout />}>
+        <Route index element={<BranchWelcomePage />} />
       </Route>
       
       <Route path="/dashboard" element={<AdminLayout />}>
