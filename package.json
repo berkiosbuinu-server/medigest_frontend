@@ -70,7 +70,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "ua-parser-js": "^2.0.9",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.10"
   },
   "devDependencies": {
@@ -93,9 +93,13 @@
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^5.4.11",
+    "vite": "^5.4.21",
     "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-svgr": "^5.2.0",
     "workbox-window": "^7.4.0"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0",
+    "serialize-javascript": "^6.0.2"
   }
 }
