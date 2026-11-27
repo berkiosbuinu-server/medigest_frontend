@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Download,
   RefreshCw,
+  type LucideIcon,
 } from 'lucide-react';
 import { inventoryService } from '@/services/inventoryService';
 import type {
@@ -44,7 +45,7 @@ interface StatusConfig {
   label: string;
   color: string;
   borderColor: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   description: string;
 }
 

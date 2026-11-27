@@ -78,7 +78,7 @@ export default function BranchSelectionPage() {
         code: branch.code || '',
         parent_pharmacy_id: '',
         is_main_branch: Boolean(branch.is_main_branch),
-        is_active: branch.is_active !== false,
+        is_active: true,
         address: branch.address || '',
         city: branch.city || '',
         phone: branch.phone || null,
