@@ -13,7 +13,6 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  ArrowRight,
   Building2,
   CreditCard,
   LayoutDashboard,
@@ -25,7 +24,7 @@ import {
 } from 'lucide-react';
 
 import { useAuthStore } from '@/store/useAuthStore';
-import { useActiveBranch } from '@/hooks/useActiveBranch';
+import { usePharmacy } from '@/contexts/PharmacyContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { ExpiryWarningBanner } from '@/components/ExpiryWarningBanner';
 import dashboardService, {
@@ -267,13 +266,25 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isSuperAdmin } = useAuthStore();
 
-  const {
-    id: branchId,
-    name: branchName,
-    isMainBranch,
-    parentPharmacyName,
-    isLoading: isLoadingBranch,
-  } = useActiveBranch();
+  // Branche active : même source que le reste de l'application (PharmacyContext),
+  // avec repli sur la branche mémorisée (localStorage) puis sur celle de l'utilisateur.
+  const { currentBranch, currentPharmacy, isLoading: isLoadingBranch } = usePharmacy();
+
+  const branchId = useMemo((): string | null => {
+    const u = user as { branch_id?: string | null; active_branch_id?: string | null; branch_name?: string } | null;
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem('active_branch_id');
+    } catch {
+      stored = null;
+    }
+    return currentBranch?.id || stored || u?.active_branch_id || u?.branch_id || null;
+  }, [currentBranch, user]);
+
+  const branchName =
+    currentBranch?.name || (user as { branch_name?: string } | null)?.branch_name || null;
+  const isMainBranch = Boolean(currentBranch?.is_main_branch);
+  const parentPharmacyName = currentPharmacy?.name || null;
 
   const {
     subscription,
@@ -326,14 +337,14 @@ const Dashboard: React.FC = () => {
     error: dataError,
     refetch,
   } = useQuery<CurrencySummaryResponse>({
-    queryKey: ['dashboard', 'currency-summary', branchId, range.start, range.end],
+    queryKey: ['dashboard', 'currency-summary', branchId ?? 'all', range.start, range.end],
     queryFn: () =>
       dashboardService.getCurrencySummary({
         branch_id: branchId ?? undefined,
         start_date: range.start,
         end_date: range.end,
       }),
-    enabled: Boolean(isAuthenticated && branchId),
+    enabled: Boolean(isAuthenticated) && !isLoadingBranch,
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
@@ -373,7 +384,7 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               <Building2 size={16} className="text-blue-500 dark:text-blue-400" />
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                {branchName || 'Branche non spécifiée'}
+                {branchName || (branchId ? 'Branche active' : 'Toutes les branches')}
               </p>
               {isMainBranch && (
                 <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900 dark:text-purple-300">
@@ -423,19 +434,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Contenu */}
-      {!branchId && !isLoadingBranch ? (
-        <div className="rounded-2xl border border-slate-100 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
-          <Building2 size={40} className="mx-auto mb-3 text-slate-400" />
-          <p className="text-slate-600 dark:text-slate-300">Aucune branche active sélectionnée.</p>
-          <button
-            type="button"
-            onClick={() => navigate('/select-branch')}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
-          >
-            Choisir une branche <ArrowRight size={16} />
-          </button>
-        </div>
-      ) : showSkeleton ? (
+      {showSkeleton ? (
         <SkeletonGrid />
       ) : dataError && !data ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-800/50 dark:bg-red-900/20">
