@@ -44,6 +44,7 @@ import StockReport from '@/modules/vendor/stockReport';
 import UserPageControl from '@/pages/users/UserPageControl';
 import Alerts from '@/modules/inventory/alerts';
 import CorbeillePage from '@/pages/CorbeillePage';
+import BranchSelectionPage from '@/pages/BranchSelectionPage';
 
 // ========== COMPOSANTS WRAPPERS ==========
 
@@ -114,6 +115,13 @@ const AdminLayout = () => {
   // Seuls les vendeurs (seller) sont exclus car ils ont leur propre layout
   const isAuthorized = user && user.role !== 'seller' && user.role !== 'vendeur';
   
+  const isBranchlessAdmin = user?.role === 'admin' && !user.branch_id;
+  const hasSelectedBranch = Boolean(localStorage.getItem('active_branch_id'));
+
+  if (isBranchlessAdmin && !hasSelectedBranch) {
+    return <Navigate to="/select-branch" replace />;
+  }
+
   if (!isAuthorized) {
     console.log('Accès refusé - AdminLayout:', { role: user?.role });
     return <Navigate to="/login" replace />;
@@ -208,7 +216,10 @@ const PublicLayout = () => {
       case 'vendeur':
         return <Navigate to="/vendor-pos" replace />;
       default:
-        // admin, pharmacien, caissier, comptable, user, etc.
+        // Un admin global doit choisir explicitement sa branche après connexion.
+        if (user.role === 'admin' && !user.branch_id) {
+          return <Navigate to="/select-branch" replace />;
+        }
         return <Navigate to="/dashboard" replace />;
     }
   }
@@ -252,6 +263,9 @@ export default function AppRoutes() {
   
   return (
     <Routes>
+      {/* Sélection de branche : accessible après authentification */}
+      <Route path="/select-branch" element={<BranchSelectionPage />} />
+
       {/* ROUTES PUBLIQUES */}
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<Login />} />

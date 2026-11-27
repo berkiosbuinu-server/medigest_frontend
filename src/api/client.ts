@@ -173,6 +173,14 @@ api.interceptors.request.use(
       if (pharmacyId) {
         config.headers['X-Pharmacy-ID'] = pharmacyId;
       }
+      // Contexte métier explicite : l'admin global choisit sa branche.
+      // Ne jamais déduire automatiquement une branche depuis son profil.
+      const activeBranchId = localStorage.getItem('active_branch_id');
+      if (activeBranchId) {
+        config.headers['X-Branch-ID'] = activeBranchId;
+      } else {
+        delete config.headers['X-Branch-ID'];
+      }
       if (state.tenantId) {
         config.headers['X-Tenant-ID'] = state.tenantId;
       }

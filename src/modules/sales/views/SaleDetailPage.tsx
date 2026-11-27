@@ -224,11 +224,7 @@ export default function SaleDetailPage() {
         <body>
           <div class="container">
             <div class="header">
-<<<<<<< HEAD
-              <h1>GoApp Pharmacie</h1>
-=======
               <h1>MEDIGEST PRO</h1>
->>>>>>> reprise_facture_me
               <h2>Facture #${sale?.reference || id}</h2>
               <p>${sale ? formatDateTime(sale.created_at) : ''}</p>
             </div>

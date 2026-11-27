@@ -65,6 +65,10 @@ api.interceptors.request.use(
       }
     }
     
+    const activeBranchId = localStorage.getItem('active_branch_id');
+    if (activeBranchId) config.headers['X-Branch-ID'] = activeBranchId;
+    else delete config.headers['X-Branch-ID'];
+
     return config;
   },
   (error: AxiosError) => {

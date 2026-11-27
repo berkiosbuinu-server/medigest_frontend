@@ -214,6 +214,9 @@ class DashboardApiClientV3 {
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        const activeBranchId = localStorage.getItem('active_branch_id');
+        if (activeBranchId) config.headers['X-Branch-ID'] = activeBranchId;
+        else delete config.headers['X-Branch-ID'];
         return config;
       },
       (error) => Promise.reject(error)

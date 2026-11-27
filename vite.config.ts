@@ -64,10 +64,12 @@ export default defineConfig({
   
   server: {
     port: 5173,
+    strictPort: true, // Tauri attend exactement ce port (devUrl)
     host: true,
     watch: {
       usePolling: false,
-      interval: 1000
+      interval: 1000,
+      ignored: ['**/src-tauri/**'], // ne pas recharger quand Rust recompile
     },
     proxy: {
       '/api': {
@@ -86,31 +88,29 @@ export default defineConfig({
   
   build: {
     outDir: 'dist',
-    sourcemap: true,  // Temporairement true pour debug
+    // Pas de sourcemaps dans l'installateur desktop (TAURI_ENV_PLATFORM est défini par `tauri build`)
+    sourcemap: !process.env.TAURI_ENV_PLATFORM,
     rollupOptions: {
       output: {
+        // Rollup (Vite 5) : on cible les paquets par leur nom exact, sinon
+        // `id.includes('react')` attrape aussi react-query, lucide-react, etc.
+        // et crée des dépendances circulaires entre chunks.
         manualChunks: (id: string) => {
-          // Debug: log les gros modules
-          if (id.includes('node_modules')) {
-            const moduleName = id.split('node_modules/').pop()?.split('/')[0];
-            if (moduleName === 'recharts' || moduleName === 'lucide-react') {
-              console.log(`[CHUNK DEBUG] Processing large module: ${moduleName}`);
-            }
+          if (!id.includes('node_modules')) return undefined;
+
+          const match = id.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/g);
+          const pkg = match?.[match.length - 1]?.replace('node_modules/', '');
+
+          if (pkg === 'react' || pkg === 'react-dom' || pkg === 'scheduler') {
+            return 'react-vendor';
           }
-          
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'react-vendor'
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor'
-            }
-            if (id.includes('lucide-react') || id.includes('sonner') || id.includes('recharts')) {
-              return 'ui-vendor'
-            }
-            return 'vendor'
+          if (pkg === '@tanstack/react-query' || pkg === '@tanstack/query-core') {
+            return 'query-vendor';
           }
-          return undefined;
+          if (pkg === 'lucide-react' || pkg === 'sonner' || pkg === 'recharts') {
+            return 'ui-vendor';
+          }
+          return 'vendor';
         },
       },
     },

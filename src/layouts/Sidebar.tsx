@@ -27,7 +27,7 @@ import {
   LineChart, CreditCard, UsersRound, TruckIcon,
   Calculator, Crown, ClipboardList,
   BarChart3, Receipt,
-  ChartBar, ChartPie, ChartLine, FileBarChart
+  ChartBar, ChartPie, ChartLine, FileBarChart, Building2
 } from 'lucide-react';
 import NotificationDrawer from './NotificationDrawer';
 
@@ -94,6 +94,17 @@ const formatRole = (role: string): string => {
  * Chaque élément est filtré selon le rôle de l'utilisateur
  */
 const menuGroups: MenuGroup[] = [
+  {
+    title: "Espace de travail",
+    items: [
+      {
+        icon: <Building2 size={20}/>,
+        label: 'Changer de branche',
+        href: '/select-branch',
+        roles: ["admin"]
+      }
+    ]
+  },
   {
     title: "Général",
     items: [

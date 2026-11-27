@@ -161,6 +161,21 @@ export function PharmacyProvider({ children }: PharmacyProviderProps) {
       setBranches(accessibleBranches);
       
       // ✅ Déterminer la branche courante (sans déclencher de re-rendu infini)
+      // Un admin sans branche est global au tenant : aucune branche par défaut.
+      if (user?.role === 'admin' && !user.branch_id) {
+        const selectedId = localStorage.getItem('active_branch_id');
+        const selectedBranch = selectedId
+          ? accessibleBranches.find((branch: Branch) => branch.id === selectedId && branch.is_active)
+          : null;
+        setCurrentBranch(selectedBranch || null);
+        if (selectedBranch) {
+          localStorage.setItem('currentBranch', JSON.stringify(selectedBranch));
+        } else {
+          localStorage.removeItem('currentBranch');
+        }
+        return;
+      }
+
       let targetBranch: Branch | null = null;
       
       // 1. Vendeur: utiliser sa branche assignée
