@@ -256,7 +256,7 @@ export const DateRangePicker = forwardRef<HTMLDivElement, DateRangePickerProps>(
     );
     const [selecting, setSelecting] = useState<'start' | 'end'>('start');
     
-    const pickerRef = useRef<HTMLDivElement>(null);
+    const pickerRef = useRef<HTMLDivElement | null>(null);
 
     // Fonction pour combiner les refs (ref externe + ref interne)
     const setRefs = (element: HTMLDivElement | null) => {
