@@ -1,4 +1,5 @@
 // components/inventory/InventoryListView.tsx
+import { formatMoney, normalizeCurrency, currencyLabel, PRODUCT_CURRENCIES } from '../../formatters';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -79,6 +80,7 @@ interface ProductFormData {
   description: string;
   quantity: number;
   purchase_price: number;
+  currency: string;
   selling_price: number;
   selling_price_wholesale: number;
   selling_price_retail: number;
@@ -187,7 +189,7 @@ export default function InventoryListView({
   }, [initialBranchId, activeDefaultBranchId]);
 
   // Configuration de la pharmacie
-  const { config, salesType, formatPrice, defaultMargin, isAutomaticPricing, automaticPricingMethod, automaticPricingValue, taxRate, lowStockThreshold } = usePharmacyConfig(effectivePharmacyId);
+  const { config, salesType, primaryCurrency, defaultMargin, isAutomaticPricing, automaticPricingMethod, automaticPricingValue, taxRate, lowStockThreshold } = usePharmacyConfig(effectivePharmacyId);
   
   // Utilisation de useAlerts avec les bonnes options - ne récupérer que refresh
   const { refresh: refreshAlerts } = useAlerts({
@@ -279,6 +281,7 @@ export default function InventoryListView({
     description: '',
     quantity: 0,
     purchase_price: 0,
+    currency: normalizeCurrency(primaryCurrency),
     selling_price: 0,
     selling_price_wholesale: 0,
     selling_price_retail: 0,
@@ -386,6 +389,7 @@ export default function InventoryListView({
         description: (productToEdit as Product & { description?: string }).description ?? '',
         quantity: toNumber(productToEdit.quantity, 0),
         purchase_price: toNumber(productToEdit.purchase_price, 0),
+        currency: normalizeCurrency(productToEdit.currency),
         selling_price: toNumber(productToEdit.selling_price, 0),
         selling_price_wholesale: toNumber(
           (productToEdit as Product & { selling_price_wholesale?: number }).selling_price_wholesale,
@@ -568,6 +572,7 @@ export default function InventoryListView({
         description: formData.description.trim() || undefined,
         quantity: toNumber(formData.quantity, 0),
         purchase_price: toNumber(formData.purchase_price, 0),
+        currency: normalizeCurrency(formData.currency),
         selling_price: sellingPriceValue,
         selling_price_wholesale: sellingPriceWholesaleValue,
         selling_price_retail: sellingPriceRetailValue,
@@ -771,19 +776,25 @@ export default function InventoryListView({
   // Statistiques globales (tous les produits correspondant aux filtres)
   const stats = useMemo(() => {
     const total = summaryData?.total ?? 0;
-    const totalStockValue = summaryData?.total_value_purchase ?? 0;
-    const totalSellingValue =
+    const pickSelling = (t: { total_value_selling: number; total_value_selling_wholesale: number; total_value_selling_retail: number }) =>
       salesType === 'wholesale'
-        ? summaryData?.total_value_selling_wholesale ?? 0
+        ? t.total_value_selling_wholesale
         : salesType === 'retail'
-          ? summaryData?.total_value_selling_retail ?? 0
-          : summaryData?.total_value_selling ?? 0;
+          ? t.total_value_selling_retail
+          : t.total_value_selling;
+    // Une ligne par devise : on n'additionne jamais des FC avec des USD ou des EUR
+    const byCurrency = Object.entries(summaryData?.by_currency ?? {})
+      .map(([currency, t]) => ({
+        currency,
+        purchase: t.total_value_purchase,
+        selling: pickSelling(t),
+      }))
+      .sort((x, y) => x.currency.localeCompare(y.currency));
     return {
       total,
       outOfStock: summaryData?.out_of_stock ?? 0,
       lowStock: summaryData?.low_stock ?? 0,
-      totalStockValue,
-      totalSellingValue,
+      byCurrency,
     };
   }, [summaryData, salesType]);
 
@@ -1027,6 +1038,22 @@ export default function InventoryListView({
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Devise du produit
+                </label>
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-medical"
+                >
+                  {PRODUCT_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{currencyLabel(c)}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">Les prix d'achat et de vente sont saisis dans cette devise.</p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Prix d'achat
                 </label>
                 <input
@@ -1266,6 +1293,13 @@ export default function InventoryListView({
     return categories.map(cat => ({ value: cat.name, label: cat.name }));
   }, [categories]);
 
+  // Formatage dans la devise du produit (repli : devise principale de la pharmacie)
+  const formatProductPrice = useCallback(
+    (price: number | undefined | null, currency?: string | null) =>
+      formatMoney(price, currency ?? primaryCurrency),
+    [primaryCurrency],
+  );
+
   // Callbacks stables (via ref) pour que les lignes mémoïsées ne se re-rendent pas inutilement
   const handlersRef = useRef({ edit: handleOpenEditForm, view: handleViewProduct });
   handlersRef.current = { edit: handleOpenEditForm, view: handleViewProduct };
@@ -1344,21 +1378,26 @@ export default function InventoryListView({
         </div>
         <div className="bg-white rounded-xl p-3 border border-slate-200">
           <p className="text-xs text-slate-500">Valeur du stock (achat)</p>
-          <p className="text-xl font-bold">{formatPrice(stats.totalStockValue)}</p>
+          {stats.byCurrency.length === 0 ? <p className="text-xl font-bold">{formatMoney(0, primaryCurrency)}</p> : stats.byCurrency.map((c) => (
+            <p key={c.currency} className="text-xl font-bold">{formatMoney(c.purchase, c.currency)}</p>
+          ))}
           <p className="text-xs text-slate-400 mt-1">(qté × prix achat)</p>
         </div>
         <div className="bg-green-50 rounded-xl p-3 border border-green-200">
           <p className="text-xs text-green-600">Valeur de vente</p>
-          <p className="text-xl font-bold text-green-600">{formatPrice(stats.totalSellingValue)}</p>
+          {stats.byCurrency.length === 0 ? <p className="text-xl font-bold text-green-600">{formatMoney(0, primaryCurrency)}</p> : stats.byCurrency.map((c) => (
+            <p key={c.currency} className="text-xl font-bold text-green-600">{formatMoney(c.selling, c.currency)}</p>
+          ))}
           <p className="text-xs text-green-500 mt-1">(qté × prix vente)</p>
         </div>
         <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
           <p className="text-xs text-amber-600">Marge estimée</p>
-          <p className="text-xl font-bold text-amber-600">
-            {stats.totalStockValue > 0 
-              ? Math.round(((stats.totalSellingValue - stats.totalStockValue) / stats.totalStockValue) * 100) 
-              : 0}%
-          </p>
+          {stats.byCurrency.length === 0 ? <p className="text-xl font-bold text-amber-600">0%</p> : stats.byCurrency.map((c) => (
+            <p key={c.currency} className="text-xl font-bold text-amber-600">
+              {c.purchase > 0 ? Math.round(((c.selling - c.purchase) / c.purchase) * 100) : 0}%
+              {stats.byCurrency.length > 1 && <span className="ml-1 text-xs font-medium">{c.currency}</span>}
+            </p>
+          ))}
           <p className="text-xs text-amber-500 mt-1">(vente - achat) / achat</p>
         </div>
       </div>
@@ -1406,7 +1445,7 @@ export default function InventoryListView({
                   product={product}
                   onEdit={onEditProduct}
                   onView={onViewProduct}
-                  formatPrice={formatPrice}
+                  formatPrice={formatProductPrice}
                   salesType={salesType}
                 />
               ))}
@@ -1448,7 +1487,7 @@ export default function InventoryListView({
                       product={product}
                       onEdit={onEditProduct}
                       onView={onViewProduct}
-                      formatPrice={formatPrice}
+                      formatPrice={formatProductPrice}
                       salesType={salesType}
                     />
                   ))}
@@ -1539,7 +1578,7 @@ export default function InventoryListView({
             <Expiration
               pharmacyId={effectivePharmacyId}
               branchId={effectiveBranchId}
-              formatPrice={formatPrice}
+              formatPrice={formatProductPrice}
               onViewProduct={(product: Product) => {
                 setSelectedProduct(product);
                 setShowProductDetail(true);
@@ -1551,7 +1590,7 @@ export default function InventoryListView({
           <StockAlert
             pharmacyId={effectivePharmacyId}
             branchId={effectiveBranchId}
-            formatPrice={formatPrice}
+            formatPrice={formatProductPrice}
             onViewProduct={(product: Product) => {
               setSelectedProduct(product);
               setShowProductDetail(true);
@@ -1689,7 +1728,7 @@ export default function InventoryListView({
             setShowProductDetail(false);
             handleOpenEditForm(selectedProduct);
           }}
-          formatPrice={formatPrice}
+          formatPrice={formatProductPrice}
           salesType={salesType}
         />
       )}
@@ -1709,7 +1748,7 @@ export default function InventoryListView({
             setShowProductSearch(false);
           }}
           onClose={() => setShowProductSearch(false)}
-          formatPrice={formatPrice}
+          formatPrice={formatProductPrice}
         />
       )}
     </div>

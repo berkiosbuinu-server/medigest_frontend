@@ -1223,7 +1223,7 @@ const ConfigView: React.FC = () => {
                   <div>
                     <p className="font-medium">Devise par défaut: {primaryCurrency}</p>
                     <p className="text-sm text-muted-foreground">
-                      Tous les prix seront affichés dans cette devise par défaut.
+                      Devise par défaut des nouveaux produits et des rapports. Chaque produit garde et affiche sa propre devise (FC, USD, EUR…), choisie dans sa fiche : le stock n'est pas forcé en FC.
                       Si vous activez la vente en USD, les prix seront convertis automatiquement selon le taux du jour.
                     </p>
                   </div>
@@ -1318,7 +1318,7 @@ const ConfigView: React.FC = () => {
               </div>
               
               <div className="border-t pt-6">
-                <Label>Devise pour les prix d'achat</Label>
+                <Label>Devise d'achat par défaut</Label>
                 <Select value={purchaseCurrency} onValueChange={setPurchaseCurrency}>
                   <SelectTrigger className="w-48 mt-1">
                     <SelectValue />
@@ -1332,7 +1332,7 @@ const ConfigView: React.FC = () => {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Les prix d'achat seront enregistrés dans cette devise
+                  Proposée par défaut à la création d'un produit ; modifiable produit par produit
                 </p>
               </div>
               

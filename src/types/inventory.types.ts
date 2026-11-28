@@ -155,6 +155,8 @@ export interface Product {
   category_id?: ID;
 
   purchase_price: number;
+  /** Devise du produit (FC, CDF, USD, EUR) – définie par le serveur */
+  currency?: string;
   selling_price: number;
   selling_price_wholesale?: number;
   selling_price_retail?: number;
@@ -221,6 +223,7 @@ export interface Product {
 export interface ProductCreate {
   code: string;
   name: string;
+  currency?: string;
   commercial_name?: string | null;
   description?: string;
   category?: string;
@@ -261,6 +264,7 @@ export interface ProductCreate {
 }
 
 export interface ProductUpdate {
+  currency?: string;
   code?: string;
   name?: string;
   commercial_name?: string | null;

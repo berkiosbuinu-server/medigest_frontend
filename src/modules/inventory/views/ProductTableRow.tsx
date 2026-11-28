@@ -7,7 +7,7 @@ interface ProductTableRowProps {
   product: Product;
   onEdit: (product: Product) => void;
   onView: (product: Product) => void;
-  formatPrice: (price: number | undefined | null, currency?: 'CDF' | 'USD') => string;
+  formatPrice: (price: number | undefined | null, currency?: string | null) => string;
   salesType?: SalesType;
   exchangeRate?: number;
   primaryCurrency?: 'CDF' | 'USD';
@@ -131,23 +131,23 @@ function ProductTableRowImpl({
         </div>
       </td>
 
-      {/* Colonne 4: Prix d'achat (uniquement en FC) */}
+      {/* Colonne 4: Prix d'achat (dans la devise du produit) */}
       <td className="px-4 py-3 text-right">
         <div className="font-medium text-slate-700">
-          {formatPrice(purchasePrice, 'CDF')}
+          {formatPrice(purchasePrice, product.currency)}
         </div>
       </td>
 
-      {/* Colonne 5: Prix de vente (uniquement en FC) */}
+      {/* Colonne 5: Prix de vente (dans la devise du produit) */}
       <td className="px-4 py-3 text-right">
         <div className="flex flex-col items-end">
           <span className="font-bold text-medical">
-            {formatPrice(sellingPrice, 'CDF')}
+            {formatPrice(sellingPrice, product.currency)}
           </span>
         </div>
         {salesType === 'both' && (product as any).selling_price_wholesale && (
           <div className="text-xs text-slate-400 mt-0.5">
-            Gros: {formatPrice((product as any).selling_price_wholesale, 'CDF')}
+            Gros: {formatPrice((product as any).selling_price_wholesale, product.currency)}
           </div>
         )}
       </td>

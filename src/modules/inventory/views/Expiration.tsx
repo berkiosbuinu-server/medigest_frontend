@@ -30,7 +30,7 @@ import type {
 interface ExpirationProps {
   pharmacyId: string;
   branchId?: string;
-  formatPrice: (price: number) => string;
+  formatPrice: (price: number, currency?: string | null) => string;
   onViewProduct?: (product: Product) => void;
 }
 
@@ -705,10 +705,10 @@ export default function Expiration({
                           {product.unit && <span className="text-xs text-slate-400 ml-1">{product.unit}</span>}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-600">
-                          {formatPrice(product.purchase_price)}
+                          {formatPrice(product.purchase_price, product.currency)}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-600">
-                          {formatPrice(product.selling_price)}
+                          {formatPrice(product.selling_price, product.currency)}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <div className="font-mono">{formatDate(product.expiry_date)}</div>

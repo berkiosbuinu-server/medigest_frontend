@@ -7,7 +7,7 @@ import type { Product } from '@/types/inventory.types';
 interface ProductSearchModalProps {
   onSelect: (product: Product) => void;
   onClose: () => void;
-  formatPrice: (price: number | undefined | null) => string;
+  formatPrice: (price: number | undefined | null, currency?: string | null) => string;
 }
 
 export default function ProductSearchModal({
@@ -143,7 +143,7 @@ export default function ProductSearchModal({
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-medical">
-                      {formatPrice(product.selling_price)}
+                      {formatPrice(product.selling_price, product.currency)}
                     </p>
                     {product.quantity <= product.alert_threshold && product.quantity > 0 && (
                       <p className="text-xs text-amber-500">Stock faible</p>

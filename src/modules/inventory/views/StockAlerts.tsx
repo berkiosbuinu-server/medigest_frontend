@@ -1,4 +1,5 @@
 // components/inventory/StockAlert.tsx
+import { formatMoney } from '../../formatters';
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,7 +25,7 @@ type TabType = 'ruptures' | 'jamais_vendus' | 'peremptions';
 interface StockAlertProps {
   pharmacyId: string;
   branchId?: string;
-  formatPrice?: (price: number) => string;
+  formatPrice?: (price: number, currency?: string | null) => string;
   onViewProduct?: (product: Product) => void;
 }
 
@@ -39,7 +40,7 @@ interface TransformedExpiryAlert {
 export default function StockAlert({
   pharmacyId,
   branchId,
-  formatPrice = (price) => `${price.toLocaleString()} FC`,
+  formatPrice = (price, currency) => formatMoney(price, currency),
   onViewProduct,
 }: StockAlertProps) {
   const queryClient = useQueryClient();
@@ -368,8 +369,8 @@ export default function StockAlert({
                       <span className="text-amber-500">Stock faible ({product.quantity} unités)</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm">{formatPrice(product.purchase_price || 0)}</td>
-                  <td className="px-4 py-3 text-right text-sm">{formatPrice(product.selling_price || 0)}</td>
+                  <td className="px-4 py-3 text-right text-sm">{formatPrice(product.purchase_price || 0, product.currency)}</td>
+                  <td className="px-4 py-3 text-right text-sm">{formatPrice(product.selling_price || 0, product.currency)}</td>
                   <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => onViewProduct?.(product)}
@@ -421,8 +422,8 @@ export default function StockAlert({
                 <td className="px-4 py-3 text-center">
                   <span className="text-sm">{product.quantity || 0} unités</span>
                 </td>
-                <td className="px-4 py-3 text-right text-sm">{formatPrice(product.purchase_price || 0)}</td>
-                <td className="px-4 py-3 text-right text-sm">{formatPrice(product.selling_price || 0)}</td>
+                <td className="px-4 py-3 text-right text-sm">{formatPrice(product.purchase_price || 0, product.currency)}</td>
+                <td className="px-4 py-3 text-right text-sm">{formatPrice(product.selling_price || 0, product.currency)}</td>
                 <td className="px-4 py-3 text-sm text-slate-500">
                   {product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}
                 </td>

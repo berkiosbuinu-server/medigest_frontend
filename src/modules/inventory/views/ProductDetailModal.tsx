@@ -9,7 +9,7 @@ interface ProductDetailModalProps {
   product: Product;
   onClose: () => void;
   onEdit: () => void;
-  formatPrice: (price: number | undefined | null) => string;
+  formatPrice: (price: number | undefined | null, currency?: string | null) => string;
   salesType?: SalesType;
 }
 
@@ -234,12 +234,12 @@ export default function ProductDetailModal({
                 <span className="text-sm font-medium">Prix de vente</span>
               </div>
               <p className="text-2xl font-bold text-medical">
-                {formatPrice(sellingPrice)}
+                {formatPrice(sellingPrice, product.currency)}
               </p>
               {wholesalePrice && retailPrice && (
                 <div className="mt-2 text-xs text-slate-500 space-y-1">
-                  <p>Gros: {formatPrice(wholesalePrice)}</p>
-                  <p>Détail: {formatPrice(retailPrice)}</p>
+                  <p>Gros: {formatPrice(wholesalePrice, product.currency)}</p>
+                  <p>Détail: {formatPrice(retailPrice, product.currency)}</p>
                 </div>
               )}
               {product.margin_rate !== undefined && (
@@ -254,7 +254,7 @@ export default function ProductDetailModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-slate-400 block mb-1">Prix d'achat (HT)</label>
-              <p className="text-slate-700 font-medium">{formatPrice(product.purchase_price)}</p>
+              <p className="text-slate-700 font-medium">{formatPrice(product.purchase_price, product.currency)}</p>
             </div>
             <div>
               <label className="text-xs text-slate-400 block mb-1">TVA</label>
@@ -335,7 +335,7 @@ export default function ProductDetailModal({
               </div>
               <div>
                 <label className="text-xs text-slate-400 block">Valeur du stock</label>
-                <p className="text-slate-700 font-medium">{formatPrice(product.selling_value)}</p>
+                <p className="text-slate-700 font-medium">{formatPrice(product.selling_value, product.currency)}</p>
               </div>
               {product.description && (
                 <div className="col-span-2">

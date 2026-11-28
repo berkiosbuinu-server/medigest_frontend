@@ -56,22 +56,29 @@ interface ProductListParams extends Record<string, unknown> {
   min_price?: number;
   max_price?: number;
   include_sales_stats?: boolean;
+  currency?: string;
   sort_by?: 'name' | 'quantity' | 'selling_price' | 'purchase_price' | 'expiry_date' | 'created_at';
   sort_order?: 'asc' | 'desc';
   branch_id?: string;
   pharmacy_id?: string;
 }
 
-export interface ProductsSummary {
-  total: number;
+export interface CurrencyTotals {
+  count: number;
   total_value_purchase: number;
   total_value_selling: number;
   total_value_selling_wholesale: number;
   total_value_selling_retail: number;
+}
+
+export interface ProductsSummary {
+  total: number;
   out_of_stock: number;
   low_stock: number;
   expiring_soon: number;
   expired: number;
+  /** Valeurs monétaires séparées par devise (jamais additionnées entre devises) */
+  by_currency: Record<string, CurrencyTotals>;
 }
 
 interface MovementParams extends Record<string, unknown> {

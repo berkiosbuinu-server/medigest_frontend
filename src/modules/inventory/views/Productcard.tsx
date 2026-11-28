@@ -8,7 +8,7 @@ interface ProductCardProps {
   product: Product;
   onEdit: (product: Product) => void;
   onView: (product: Product) => void;
-  formatPrice: (price: number | undefined | null) => string;
+  formatPrice: (price: number | undefined | null, currency?: string | null) => string;
   salesType?: SalesType;
 }
 
@@ -97,11 +97,11 @@ function ProductCardImpl({
         <div className="mt-3 flex justify-between items-end">
           <div>
             <p className="text-lg font-bold text-medical">
-              {formatPrice(getSellingPrice())}
+              {formatPrice(getSellingPrice(), product.currency)}
             </p>
             {salesType === 'both' && (product as any).selling_price_wholesale && (
               <p className="text-xs text-slate-400">
-                Gros: {formatPrice((product as any).selling_price_wholesale)}
+                Gros: {formatPrice((product as any).selling_price_wholesale, product.currency)}
               </p>
             )}
           </div>
