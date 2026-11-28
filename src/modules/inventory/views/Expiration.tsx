@@ -89,6 +89,7 @@ interface DisplayExpiryProduct {
   quantity: number;
   purchase_price: number;
   selling_price: number;
+  currency?: string | null;
   expiry_date: string | null;
   days_until_expiry: number | null;
   expiry_status: ExpiryStatus | null;
@@ -151,6 +152,7 @@ function productToDisplayProduct(product: Product): DisplayExpiryProduct {
     barcode: product.barcode ?? null,
     quantity: product.quantity,
     purchase_price: product.purchase_price,
+    currency: product.currency ?? null,
     selling_price: product.selling_price,
     expiry_date: product.expiry_date ?? null,
     days_until_expiry: daysUntilExpiry,

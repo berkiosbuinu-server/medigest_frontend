@@ -683,6 +683,7 @@ export default function InventoryListView({
       description: '',
       quantity: 0,
       purchase_price: 0,
+      currency: normalizeCurrency(primaryCurrency),
       selling_price: 0,
       selling_price_wholesale: 0,
       selling_price_retail: 0,
