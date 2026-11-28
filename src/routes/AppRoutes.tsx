@@ -46,6 +46,7 @@ import UserPageControl from '@/pages/users/UserPageControl';
 import Alerts from '@/modules/inventory/alerts';
 import CorbeillePage from '@/pages/CorbeillePage';
 import BranchSelectionPage from '@/pages/BranchSelectionPage';
+import ControlPage from '@/pages/ControlPage';
 import BranchWelcomePage from '@/pages/BranchWelcomePage';
 
 // ========== COMPOSANTS WRAPPERS ==========
@@ -270,6 +271,9 @@ export default function AppRoutes() {
     <Routes>
       {/* Sélection de branche : accessible après authentification */}
       <Route path="/select-branch" element={<BranchSelectionPage />} />
+
+      {/* Centre technique : maintenance des branches (admin), accessible depuis la sélection de branche */}
+      <Route path="/control-center" element={<ControlPage />} />
 
       {/* ROUTES PUBLIQUES */}
       <Route element={<PublicLayout />}>

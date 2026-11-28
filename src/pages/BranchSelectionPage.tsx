@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, MapPin, Plus, RefreshCw, LogOut, CheckCircle2, Loader2, Search } from 'lucide-react';
+import { Building2, MapPin, Plus, RefreshCw, LogOut, CheckCircle2, Loader2, Search, Wrench } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/api/client';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -142,10 +142,16 @@ export default function BranchSelectionPage() {
               <p className="text-sm text-slate-500">Connecté en tant que {user?.nom_complet || user?.email}</p>
             </div>
           </div>
-          <button onClick={() => { localStorage.removeItem('active_branch_id'); localStorage.removeItem('currentBranch'); logout(); navigate('/login'); }}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-            <LogOut size={17} /> Déconnexion
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => navigate('/control-center')}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-700">
+              <Wrench size={17} /> Centre technique
+            </button>
+            <button onClick={() => { localStorage.removeItem('active_branch_id'); localStorage.removeItem('currentBranch'); logout(); navigate('/login'); }}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+              <LogOut size={17} /> Déconnexion
+            </button>
+          </div>
         </header>
 
         <section className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
