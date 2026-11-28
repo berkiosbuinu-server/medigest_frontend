@@ -56,8 +56,22 @@ interface ProductListParams extends Record<string, unknown> {
   min_price?: number;
   max_price?: number;
   include_sales_stats?: boolean;
+  sort_by?: 'name' | 'quantity' | 'selling_price' | 'purchase_price' | 'expiry_date' | 'created_at';
+  sort_order?: 'asc' | 'desc';
   branch_id?: string;
   pharmacy_id?: string;
+}
+
+export interface ProductsSummary {
+  total: number;
+  total_value_purchase: number;
+  total_value_selling: number;
+  total_value_selling_wholesale: number;
+  total_value_selling_retail: number;
+  out_of_stock: number;
+  low_stock: number;
+  expiring_soon: number;
+  expired: number;
 }
 
 interface MovementParams extends Record<string, unknown> {
@@ -209,6 +223,16 @@ class InventoryService {
       console.error('Erreur récupération produits:', error);
       throw error;
     }
+  }
+
+  /** Totaux du stock calculés côté serveur (mêmes filtres que la liste). */
+  async getProductsSummary(
+    params?: Omit<ProductListParams, 'skip' | 'limit' | 'include_sales_stats' | 'sort_by' | 'sort_order'>,
+  ): Promise<ProductsSummary> {
+    const response = await api.get(`${this.baseUrl}/stats/summary`, {
+      params: this.cleanParams(params),
+    });
+    return response.data as ProductsSummary;
   }
 
   async getProduct(id: string): Promise<Product> {

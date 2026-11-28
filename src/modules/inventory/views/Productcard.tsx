@@ -1,17 +1,18 @@
 // components/inventory/ProductCard.tsx
+import { memo } from 'react';
 import { Edit2, Eye, Package, AlertTriangle, Calendar } from 'lucide-react';
 import { format } from '@/utils/date';
 import type { Product, SalesType } from '@/types/inventory.types';
 
 interface ProductCardProps {
   product: Product;
-  onEdit: () => void;
-  onView: () => void;
+  onEdit: (product: Product) => void;
+  onView: (product: Product) => void;
   formatPrice: (price: number | undefined | null) => string;
   salesType?: SalesType;
 }
 
-export default function ProductCard({
+function ProductCardImpl({
   product,
   onEdit,
   onView,
@@ -69,14 +70,14 @@ export default function ProductCard({
           </div>
           <div className="flex gap-1">
             <button
-              onClick={onView}
+              onClick={() => onView(product)}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
               title="Voir détails"
             >
               <Eye size={16} className="text-slate-400" />
             </button>
             <button
-              onClick={onEdit}
+              onClick={() => onEdit(product)}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
               title="Modifier"
             >
@@ -136,3 +137,7 @@ export default function ProductCard({
     </div>
   );
 }
+
+// Mémoïsé : ne se re-rend que si le produit (ou les props) change réellement
+const ProductCard = memo(ProductCardImpl);
+export default ProductCard;

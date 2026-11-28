@@ -1,6 +1,6 @@
 // components/inventory/InventoryListView.tsx
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Package,
   Plus,
@@ -224,7 +224,7 @@ export default function InventoryListView({
     branch_id: effectiveBranchId || '',
   });
   const [page, setPage] = useState(1);
-  const [limit] = useState(isMobile ? 12 : 24);
+  const [limit, setLimit] = useState(isMobile ? 25 : 48);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
@@ -232,20 +232,19 @@ export default function InventoryListView({
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'selling_price' | 'expiry_date'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Requête séparée pour les statistiques globales (tous les produits)
-  const {
-    data: globalStatsData,
-    isLoading: isLoadingGlobalStats,
-  } = useQuery({
-    queryKey: ['products-global-stats', searchQuery, filters, effectivePharmacyId, effectiveBranchId],
-    queryFn: async () => {
-      if (!effectivePharmacyId) return { total: 0, totalStockValue: 0, totalSellingValue: 0 };
-      
-      // Récupérer tous les produits sans pagination pour les statistiques globales
-      const response = await inventoryService.getProducts({
-        skip: 0,
-        limit: 10000, // Grand nombre pour récupérer tous les produits
-        search: searchQuery || undefined,
+  // Recherche différée : une requête quand l'utilisateur s'arrête de taper
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Totaux calculés en SQL côté serveur (1 requête, quel que soit le nombre de produits)
+  const { data: summaryData } = useQuery({
+    queryKey: ['products-global-stats', debouncedSearch, filters, effectivePharmacyId, effectiveBranchId],
+    queryFn: () =>
+      inventoryService.getProductsSummary({
+        search: debouncedSearch || undefined,
         category: filters.category || undefined,
         category_id: filters.category_id || undefined,
         stock_status: filters.stock_status || undefined,
@@ -255,32 +254,9 @@ export default function InventoryListView({
         max_price: filters.max_price || undefined,
         pharmacy_id: filters.pharmacy_id || undefined,
         branch_id: filters.branch_id || undefined,
-        include_sales_stats: true,
-      });
-      
-      // Calculer la valeur totale du stock (prix d'achat * quantité)
-      const totalStockValue = response.products.reduce((sum, product) => {
-        return sum + (product.purchase_price || 0) * (product.quantity || 0);
-      }, 0);
-      
-      // Calculer la valeur totale de vente (prix de vente * quantité)
-      const totalSellingValue = response.products.reduce((sum, product) => {
-        let sellingPrice = product.selling_price || 0;
-        if (salesType === 'wholesale') {
-          sellingPrice = (product as any).selling_price_wholesale || product.selling_price || 0;
-        } else if (salesType === 'retail') {
-          sellingPrice = (product as any).selling_price_retail || product.selling_price || 0;
-        }
-        return sum + sellingPrice * (product.quantity || 0);
-      }, 0);
-      
-      return {
-        total: response.total,
-        totalStockValue,
-        totalSellingValue,
-      };
-    },
-    staleTime: 30000,
+      }),
+    staleTime: 60000,
+    placeholderData: keepPreviousData,
     enabled: !!effectivePharmacyId,
   });
 
@@ -326,14 +302,14 @@ export default function InventoryListView({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['products', page, limit, searchQuery, filters, sortBy, sortOrder, effectivePharmacyId, effectiveBranchId],
+    queryKey: ['products', page, limit, debouncedSearch, filters, sortBy, sortOrder, effectivePharmacyId, effectiveBranchId],
     queryFn: async () => {
       if (!effectivePharmacyId) return { products: [], total: 0 };
       
       const response = await inventoryService.getProducts({
         skip: (page - 1) * limit,
         limit,
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         category: filters.category || undefined,
         category_id: filters.category_id || undefined,
         stock_status: filters.stock_status || undefined,
@@ -343,11 +319,13 @@ export default function InventoryListView({
         max_price: filters.max_price || undefined,
         pharmacy_id: filters.pharmacy_id || undefined,
         branch_id: filters.branch_id || undefined,
-        include_sales_stats: true,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       });
       return response;
     },
     staleTime: 30000,
+    placeholderData: keepPreviousData, // garde l'ancienne page affichée pendant le chargement
     enabled: !!effectivePharmacyId,
   });
 
@@ -772,6 +750,7 @@ export default function InventoryListView({
   };
 
   const handleSort = (field: typeof sortBy) => {
+    setPage(1);
     if (sortBy === field) {
       setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -786,52 +765,27 @@ export default function InventoryListView({
     queryClient.invalidateQueries({ queryKey: ['products-global-stats'] });
   };
 
-  // Filtrer les produits pour la recherche alphabétique (début du nom)
-  const filteredProducts = useMemo(() => {
-    if (!productsData?.products) return [];
-    
-    let filtered = [...productsData.products];
-    
-    // Recherche alphabétique - ne garde que les produits dont le nom commence par la recherche
-    if (searchQuery.trim()) {
-      const searchLower = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(product => 
-        product.name.toLowerCase().startsWith(searchLower)
-      );
-    }
-    
-    // Tri
-    filtered.sort((a, b) => {
-      let aVal: any = a[sortBy];
-      let bVal: any = b[sortBy];
+  // Recherche et tri sont faits par le serveur : la page reçue est affichée telle quelle
+  const filteredProducts = useMemo(() => productsData?.products ?? [], [productsData?.products]);
 
-      if (sortBy === 'expiry_date') {
-        aVal = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
-        bVal = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
-      }
-
-      if (sortOrder === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-    
-    return filtered;
-  }, [productsData?.products, searchQuery, sortBy, sortOrder]);
-
-  // Statistiques (basées sur les produits filtrés globalement)
+  // Statistiques globales (tous les produits correspondant aux filtres)
   const stats = useMemo(() => {
-    const total = globalStatsData?.total ?? 0;
-    const totalStockValue = globalStatsData?.totalStockValue ?? 0;
-    const totalSellingValue = globalStatsData?.totalSellingValue ?? 0;
-    
-    // Compter les produits en rupture et stock faible basé sur le statut réel des produits
-    const outOfStock = productsData?.products?.filter(p => p.stock_status === 'out_of_stock').length ?? 0;
-    const lowStock = productsData?.products?.filter(p => p.stock_status === 'low_stock').length ?? 0;
-
-    return { total, outOfStock, lowStock, totalStockValue, totalSellingValue };
-  }, [productsData?.products, globalStatsData]);
+    const total = summaryData?.total ?? 0;
+    const totalStockValue = summaryData?.total_value_purchase ?? 0;
+    const totalSellingValue =
+      salesType === 'wholesale'
+        ? summaryData?.total_value_selling_wholesale ?? 0
+        : salesType === 'retail'
+          ? summaryData?.total_value_selling_retail ?? 0
+          : summaryData?.total_value_selling ?? 0;
+    return {
+      total,
+      outOfStock: summaryData?.out_of_stock ?? 0,
+      lowStock: summaryData?.low_stock ?? 0,
+      totalStockValue,
+      totalSellingValue,
+    };
+  }, [summaryData, salesType]);
 
   // Type de vente label
   const salesTypeLabel = useMemo(() => {
@@ -840,11 +794,12 @@ export default function InventoryListView({
     return 'Gros & détail';
   }, [salesType]);
 
-  const isLoading = isLoadingPharmacy || isLoadingProducts || isLoadingGlobalStats;
+  // Seul le tout premier chargement bloque l'écran ; ensuite l'ancienne page reste visible
+  const isLoading = isLoadingPharmacy || (isLoadingProducts && !productsData);
 
   // Compter les alertes de stock basées sur le statut réel des produits
-  const outOfStockCount = productsData?.products?.filter(p => p.stock_status === 'out_of_stock').length || 0;
-  const lowStockCount = productsData?.products?.filter(p => p.stock_status === 'low_stock').length || 0;
+  const outOfStockCount = stats.outOfStock;
+  const lowStockCount = stats.lowStock;
 
   // Rendu du formulaire modal
   const renderFormModal = () => {
@@ -1311,6 +1266,12 @@ export default function InventoryListView({
     return categories.map(cat => ({ value: cat.name, label: cat.name }));
   }, [categories]);
 
+  // Callbacks stables (via ref) pour que les lignes mémoïsées ne se re-rendent pas inutilement
+  const handlersRef = useRef({ edit: handleOpenEditForm, view: handleViewProduct });
+  handlersRef.current = { edit: handleOpenEditForm, view: handleViewProduct };
+  const onEditProduct = useCallback((p: Product) => handlersRef.current.edit(p), []);
+  const onViewProduct = useCallback((p: Product) => handlersRef.current.view(p), []);
+
   // Rendu des produits
   const renderProductsTab = () => (
     <div className="space-y-4">
@@ -1321,7 +1282,7 @@ export default function InventoryListView({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              placeholder="Rechercher par nom (début du nom)..."
+              placeholder="Rechercher par nom, code ou code-barres..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -1443,8 +1404,8 @@ export default function InventoryListView({
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onEdit={() => handleOpenEditForm(product)}
-                  onView={() => handleViewProduct(product)}
+                  onEdit={onEditProduct}
+                  onView={onViewProduct}
                   formatPrice={formatPrice}
                   salesType={salesType}
                 />
@@ -1485,8 +1446,8 @@ export default function InventoryListView({
                     <ProductTableRow
                       key={product.id}
                       product={product}
-                      onEdit={() => handleOpenEditForm(product)}
-                      onView={() => handleViewProduct(product)}
+                      onEdit={onEditProduct}
+                      onView={onViewProduct}
                       formatPrice={formatPrice}
                       salesType={salesType}
                     />
@@ -1496,34 +1457,59 @@ export default function InventoryListView({
             </div>
           )}
 
-          {/* Pagination - basée sur le nombre total après filtres */}
-          {productsData.total > limit && (
-            <div className="flex justify-between items-center pt-4">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-200"
-              >
-                <ChevronLeft size={16} />
-                Précédent
-              </button>
-              <span className="text-sm text-slate-600">
-                Page {page} sur {Math.ceil(productsData.total / limit)}
-              </span>
-              <button
-                onClick={() => setPage(p => p + 1)}
-                disabled={page * limit >= productsData.total}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-200"
-              >
-                Suivant
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
-          
-          {filteredProducts.length === 0 && searchQuery && (
+          {/* Pagination serveur */}
+          {(() => {
+            const total = productsData.total;
+            const totalPages = Math.max(1, Math.ceil(total / limit));
+            const btn = 'flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-200';
+            return (
+              <div className="flex flex-wrap justify-between items-center gap-3 pt-4">
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  Par page
+                  <select
+                    value={limit}
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    className="border border-slate-200 rounded-lg px-2 py-1"
+                  >
+                    {[25, 48, 100, 200, 500].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPage(1)} disabled={page === 1} className={btn} title="Première page">«</button>
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className={btn}>
+                    <ChevronLeft size={16} />
+                    Précédent
+                  </button>
+                  <span className="text-sm text-slate-600 flex items-center gap-1">
+                    Page
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={page}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (Number.isFinite(n)) setPage(Math.min(totalPages, Math.max(1, Math.floor(n))));
+                      }}
+                      className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-center"
+                    />
+                    sur {totalPages.toLocaleString('fr-FR')} · {total.toLocaleString('fr-FR')} produits
+                  </span>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className={btn}>
+                    Suivant
+                    <ChevronRight size={16} />
+                  </button>
+                  <button onClick={() => setPage(totalPages)} disabled={page >= totalPages} className={btn} title="Dernière page">»</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {filteredProducts.length === 0 && debouncedSearch && (
             <div className="text-center py-8 text-slate-500">
-              Aucun produit ne commence par "{searchQuery}"
+              Aucun produit ne correspond à "{debouncedSearch}"
             </div>
           )}
         </>

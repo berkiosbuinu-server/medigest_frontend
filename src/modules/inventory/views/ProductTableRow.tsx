@@ -1,11 +1,12 @@
 // components/inventory/ProductTableRow.tsx
+import { memo } from 'react';
 import { Eye, Edit2, Package, CalendarClock } from 'lucide-react';
 import type { Product, SalesType, Category } from '@/types/inventory.types';
 
 interface ProductTableRowProps {
   product: Product;
-  onEdit: () => void;
-  onView: () => void;
+  onEdit: (product: Product) => void;
+  onView: (product: Product) => void;
   formatPrice: (price: number | undefined | null, currency?: 'CDF' | 'USD') => string;
   salesType?: SalesType;
   exchangeRate?: number;
@@ -73,7 +74,7 @@ const getStockStatusText = (status: string | undefined, quantity: number, thresh
   }
 };
 
-export default function ProductTableRow({
+function ProductTableRowImpl({
   product,
   onEdit,
   onView,
@@ -174,14 +175,14 @@ export default function ProductTableRow({
       <td className="px-4 py-3 text-center">
         <div className="flex items-center justify-center gap-1">
           <button
-            onClick={onView}
+            onClick={() => onView(product)}
             className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             title="Voir détails"
           >
             <Eye size={16} className="text-slate-400 hover:text-medical transition-colors" />
           </button>
           <button
-            onClick={onEdit}
+            onClick={() => onEdit(product)}
             className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             title="Modifier"
           >
@@ -192,3 +193,7 @@ export default function ProductTableRow({
     </tr>
   );
 }
+
+// Mémoïsé : ne se re-rend que si le produit (ou les props) change réellement
+const ProductTableRow = memo(ProductTableRowImpl);
+export default ProductTableRow;
