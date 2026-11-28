@@ -257,61 +257,47 @@ const Monitoring = ({ tenantId }: MonitoringProps) => {
     setError(null);
     
     try {
-      const pharmaciesRes = await api.get(`/tenants/${tenantId}/pharmacies`);
-      setPharmacies(pharmaciesRes.data);
-      
-      const statsRes = await api.get(`/tenants/${tenantId}/dashboard/stats`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          dateRange: filters.dateRange
-        }
-      });
-      setDashboardStats(statsRes.data);
-      
-      const salesRes = await api.get(`/tenants/${tenantId}/sales/recent`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          limit: 50
-        }
-      });
-      setRecentSales(salesRes.data);
-      setTotalItems(salesRes.data.length);
-      
-      const productsRes = await api.get(`/tenants/${tenantId}/products`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          lowStock: true
-        }
-      });
-      setProducts(productsRes.data);
-      
-      const expensesRes = await api.get(`/tenants/${tenantId}/expenses`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          dateRange: filters.dateRange
-        }
-      });
-      setExpenses(expensesRes.data);
-      
-      const profitRes = await api.get(`/tenants/${tenantId}/profit-loss`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          dateRange: filters.dateRange
-        }
-      });
-      setProfitLoss(profitRes.data);
-      
-      const logsRes = await api.get(`/tenants/${tenantId}/activity-logs`, {
-        params: {
-          pharmacyId: selectedPharmacy !== 'all' ? selectedPharmacy : undefined,
-          limit: 100
-        }
-      });
-      setActivityLogs(logsRes.data);
-      
-      const alertsRes = await api.get(`/tenants/${tenantId}/alerts`);
-      setAlerts(alertsRes.data);
-      
+      const ph = selectedPharmacy !== 'all' ? selectedPharmacy : undefined;
+      const base = `/tenants/${tenantId}`;
+
+      // Les 8 requêtes partent en parallèle ; une section en échec n'empêche plus les autres de s'afficher
+      const [pharm, stats, sales, prods, exps, pnl, logs, alertsRes] = await Promise.allSettled([
+        api.get(`${base}/pharmacies`),
+        api.get(`${base}/dashboard/stats`, { params: { pharmacyId: ph, dateRange: filters.dateRange } }),
+        api.get(`${base}/sales/recent`, { params: { pharmacyId: ph, limit: 50 } }),
+        api.get(`${base}/products`, { params: { pharmacyId: ph, lowStock: true } }),
+        api.get(`${base}/expenses`, { params: { pharmacyId: ph, dateRange: filters.dateRange } }),
+        api.get(`${base}/profit-loss`, { params: { pharmacyId: ph, dateRange: filters.dateRange } }),
+        api.get(`${base}/activity-logs`, { params: { pharmacyId: ph, limit: 100 } }),
+        api.get(`${base}/alerts`),
+      ]);
+
+      const list = <T,>(r: PromiseSettledResult<{ data: unknown }>): T[] =>
+        r.status === 'fulfilled' && Array.isArray(r.value.data) ? (r.value.data as T[]) : [];
+
+      setPharmacies(list<PharmacySummary>(pharm));
+      setDashboardStats(
+        stats.status === 'fulfilled' && stats.value.data && !Array.isArray(stats.value.data)
+          ? (stats.value.data as DashboardStats)
+          : null,
+      );
+      const salesList = list<Sale>(sales);
+      setRecentSales(salesList);
+      setTotalItems(salesList.length);
+      setProducts(list<Product>(prods));
+      setExpenses(list<Expense>(exps));
+      setProfitLoss(list<ProfitLoss>(pnl));
+      setActivityLogs(list<ActivityLog>(logs));
+      setAlerts(list<Alert>(alertsRes));
+
+      const results = [pharm, stats, sales, prods, exps, pnl, logs, alertsRes];
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed === results.length) {
+        setError('Erreur lors du chargement des données');
+      } else if (failed > 0) {
+        // Échec partiel : la page reste utilisable, les sections en échec restent vides
+        console.warn(`Monitoring : ${failed} section(s) n'ont pas pu être chargées`);
+      }
     } catch {
       setError('Erreur lors du chargement des données');
     } finally {
